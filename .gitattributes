@@ -1,0 +1,17 @@
+# macOS: luôn dùng LF (Xcode mong đợi LF, tránh CRLF gây diff nhiễu)
+*.swift text eol=lf
+*.m text eol=lf
+*.h text eol=lf
+*.plist text eol=lf
+*.xcscheme text eol=lf
+*.pbxproj text eol=lf
+*.xcworkspacedata text eol=lf
+*.json text eol=lf
+*.py text eol=lf
+*.md text eol=lf
+
+# Nén binary
+*.png binary
+*.jpg binary
+*.ico binary
+*.xcassets binary
