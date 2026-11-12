@@ -136,6 +136,8 @@ SHARED_PROJECT_SETTINGS = [
     ("COPY_PHASE_STRIP", "NO"),
     ("ENABLE_STRICT_OBJC_MSGSEND", "YES"),
     ("ENABLE_USER_SCRIPT_SANDBOXING", "YES"),
+    # Ngôn ngữ gốc của bundle: tiếng Việt là mặc định của app.
+    ("DEVELOPMENT_LANGUAGE", "vi"),
     ("GCC_C_LANGUAGE_STANDARD", "gnu17"),
     ("GCC_NO_COMMON_BLOCKS", "YES"),
     ("GCC_WARN_64_TO_32_BIT_CONVERSION", "YES"),
@@ -403,7 +405,7 @@ def main() -> None:
         f'\t\t\t}};\n'
         f'\t\t\tbuildConfigurationList = {project_cfg_list_uid} /* Build configuration list for PBXProject "{TARGET_NAME}" */;\n'
         f'\t\t\tcompatibilityVersion = "{COMPATIBILITY_VERSION}";\n'
-        f'\t\t\tdevelopmentRegion = en;\n'
+        f'\t\t\tdevelopmentRegion = vi;\n'
         f'\t\t\thasScannedForEncodings = 0;\n'
         f'\t\t\tknownRegions = (\n\t\t\t\ten,\n\t\t\t\tvi,\n\t\t\t\tBase,\n\t\t\t);\n'
         f'\t\t\tmainGroup = {main_group_uid};\n'
