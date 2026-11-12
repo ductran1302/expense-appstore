@@ -5,7 +5,16 @@ Toàn bộ dữ liệu lưu **cục bộ** trên máy (không cần tài khoản
 
 | Giao dịch | Thống kê | Ngân sách | Cài đặt |
 |---|---|---|---|
-| Thêm / sửa / xoá, lọc theo danh mục, tìm kiếm | Biểu đồ tròn theo danh mục, cột theo ngày, so sánh tháng trước | Hạn mức tổng & theo danh mục, cảnh báo vượt hạn mức | Đổi tiền tệ, quản lý danh mục, sao lưu JSON, xuất CSV |
+| Thêm/sửa/xoá, lọc theo danh mục, tìm kiếm, nhóm theo ngày | Biểu đồ tròn theo danh mục, cột theo ngày, so sánh tháng trước | Hạn mức tổng & theo danh mục, cảnh báo vượt hạn mức | Đổi ngôn ngữ & giao diện, quản lý danh mục, sao lưu JSON, xuất CSV |
+
+## Tính năng nổi bật
+
+- **Hai ngôn ngữ** — Tiếng Việt (mặc định) và English, chuyển ngay trong app, không cần cài lại.
+- **Sáng/Tối** — bám theo hệ thống hoặc đặt cứng trong Cài đặt.
+- **Định dạng theo vùng** — số tiền và ngày tháng đổi theo locale của ngôn ngữ đang chọn.
+- **Đọc được với VoiceOver** — nhãn tiếng Việt/Anh cho mọi biểu tượng và số liệu.
+- **Dynamic Type** — toàn bộ chữ dùng text style của hệ thống, không hard-code kích thước.
+- **12 loại tiền tệ** — VND, USD, EUR, JPY, GBP, KRW, CNY, THB, SGD, AUD, CAD, TWD.
 
 ## Yêu cầu
 
@@ -38,6 +47,7 @@ Trong Xcode:
 4. Upload lên App Store Connect, điền thông tin app:
    - **App Name**: `Chi Tiêu`
    - **Primary Category**: Finance
+   - **Languages**: chọn cả Vietnamese + English
    - **Age Rating**: 4+
    - **Privacy**: app không thu thập dữ liệu → chọn "Data Not Collected"
 5. Chờ duyệt (thường 1–24 giờ).
@@ -48,20 +58,34 @@ Trong Xcode:
 - [ ] Chọn Development Team
 - [ ] Bump `MARKETING_VERSION` (ví dụ `1.0.1`) và `CURRENT_PROJECT_VERSION` trong project settings
 - [ ] Kiểm tra icon 1024×1024 trong `Assets.xcassets/AppIcon.appiconset`
-- [ ] Cập nhật mô tả, ảnh chụp màn hình (bắt buộc: 6.7" và 5.5")
+- [ ] Cập nhật mô tả, ảnh chụp màn hình (bắt buộc: 6.7" và 5.5", cả 2 ngôn ngữ nếu bán đa ngôn ngữ)
 - [ ] `PrivacyInfo.xcprivacy` đã có sẵn (không tracking, không thu thập data)
+
+## Ngôn ngữ
+
+Bản dịch nằm trong `ExpenseTracker/Localizable.xcstrings` (String Catalog của Xcode).
+
+- Nguồn chân lý: `tools/generate_localization.py` — sửa dict `STRINGS` rồi chạy lại script.
+- `sourceLanguage` là `en`; tiếng Việt nằm trong `localizations.vi`.
+- `AppState.localizationBundle` tra cứu bundle `vi.lproj`/`en.lproj` để đổi ngôn ngữ lúc chạy.
+- Danh mục dựng sẵn có `localizationKey` nên tên danh mục cũng đổi theo ngôn ngữ.
+
+```bash
+python tools/generate_localization.py   # sinh lại .xcstrings
+python tools/check_localization_usage.py # kiểm tra L.xxx có tồn tại
+```
 
 ## Cấu trúc dự án
 
 ```
 ExpenseTracker/
 ├── App/
-│   ├── ExpenseTrackerApp.swift      # Điểm vào, khởi tạo ModelContainer
+│   ├── ExpenseTrackerApp.swift      # Điểm vào, ModelContainer, locale + color scheme
 │   ├── RootView.swift               # TabView gồm 4 tab
-│   └── AppState.swift               # State dùng chung (tiền tệ, tháng đang xem)
+│   └── AppState.swift               # State dùng chung (tiền tệ, tháng, ngôn ngữ, giao diện)
 ├── Models/
 │   ├── ExpenseTransaction.swift     # Giao dịch
-│   ├── ExpenseCategory.swift        # Danh mục
+│   ├── ExpenseCategory.swift        # Danh mục (có localizationKey)
 │   └── MonthlyBudget.swift          # Hạn mức theo tháng
 ├── Features/
 │   ├── Transactions/                # Danh sách, form thêm/sửa
@@ -74,12 +98,14 @@ ExpenseTracker/
 │   ├── SeedData.swift               # Danh mục & giao dịch mẫu
 │   └── ExportDocument.swift
 ├── Shared/
-│   ├── Theme.swift                  # Màu, thẻ, StatTile
+│   ├── Theme.swift                  # Design token: màu tự đổi sáng/tối
+│   ├── Components.swift             # Card, Badge, ProgressBar, SectionLabel
+│   ├── Localization.swift           # Enum L + AppLanguage + AppAppearance
 │   ├── MonthPicker.swift
-│   ├── Calendar+Months.swift
-│   ├── Color+Hex.swift
-│   └── DecimalParser.swift
+│   ├── Color+Hex.swift              # Màu danh mục thích ứng sáng/tối
+│   └── Calendar+Months.swift
 ├── Assets.xcassets/
+├── Localizable.xcstrings            # Bản dịch EN/VI
 ├── Info.plist
 └── PrivacyInfo.xcprivacy
 ```
@@ -95,38 +121,21 @@ python tools/generate_xcodeproj.py
 # Kiểm tra project còn hợp lệ không
 python tools/validate_xcodeproj.py
 
+# Kiểm tra cú pháp Swift cơ bản
+python tools/check_swift_syntax.py
+
+# Sinh lại bản dịch
+python tools/generate_localization.py
+
 # Sinh lại app icon
 python tools/generate_app_icon.py
 ```
 
 Cần Python 3.9+ (script sinh icon cần thêm `pip install pillow`).
 
-## Tính năng chi tiết
-
-### Giao dịch
-- Nhập nhanh số tiền (bàn phím số), chọn danh mục, ngày giờ, ghi chú
-- Vuốt để xoá, chạm để sửa
-- Nhóm theo ngày, hiển thị tổng chi mỗi ngày
-- Lọc theo danh mục, tìm kiếm theo ghi chú/danh mục
-- Chế độ "Thu nhập" (số tiền âm, hiển thị màu xanh)
-
-### Thống kê
-- Biểu đồ tròn (donut) theo danh mục
-- Biểu đồ cột theo từng ngày trong tháng
-- Tổng chi, thu nhập, trung bình/ngày, so sánh với tháng trước
-
-### Ngân sách
-- Hạn mức tổng theo tháng + hạn mức riêng cho từng danh mục
-- Thanh tiến trình đổi màu: xanh (<80%), vàng (80–100%), đỏ (>100%)
-- Hiển thị số tiền còn lại / vượt hạn mức
-
-### Sao lưu
-- **JSON** — toàn bộ danh mục, giao dịch, hạn mức (dùng để khôi phục, import tự bỏ qua trùng lặp)
-- **CSV** — danh sách giao dịch, mở bằng Excel/Numbers
-
 ## Định hướng mở rộng
 
 - Đồng bộ đám mây qua CloudKit (SwiftData hỗ trợ sẵn, chỉ cần đổi `ModelConfiguration`)
 - Widget hiển thị tổng chi ngày hôm nay
 - App Watch
-- Đa ngôn ngữ (Việt/Anh) qua String Catalog
+- Ngôn ngữ thứ ba (đã có sẵn khung `String Catalog`)

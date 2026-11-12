@@ -65,3 +65,69 @@ extension Color {
         )
     }
 }
+
+/// Màu hiển thị của một danh mục.
+///
+/// Người dùng chọn màu khi tạo danh mục (dữ liệu hex lưu trong database),
+/// nhưng màu đó phải đọc được ở cả chế độ sáng lẫn tối. Vì vậy màu được
+/// nâng độ sáng ở chế độ tối và dùng nền riêng thay vì alpha trên nền thẻ.
+struct CategoryColor {
+    /// Màu chính dùng cho biểu tượng, chữ.
+    let base: Color
+    /// Nền nhạt dùng cho huy hiệu tròn.
+    let soft: Color
+
+    init(hex: String, scheme: ColorScheme) {
+        let hue = Color(hex: hex).hue
+        let saturation = Color(hex: hex).saturation
+
+        if scheme == .dark {
+            // Nâng độ sáng để chữ đọc được trên nền tối.
+            self.base = Color(
+                hue: hue,
+                saturation: min(1, saturation * 0.9),
+                brightness: 0.82
+            )
+            self.soft = Color(
+                hue: hue,
+                saturation: min(1, saturation * 0.7),
+                brightness: 0.26
+            )
+        } else {
+            self.base = Color(
+                hue: hue,
+                saturation: min(1, saturation * 0.95),
+                brightness: 0.62
+            )
+            self.soft = Color(
+                hue: hue,
+                saturation: min(1, saturation * 0.65),
+                brightness: 0.94
+            )
+        }
+    }
+}
+
+extension Color {
+    /// Khoảng cách màu (0...1).
+    var hue: Double {
+        let uiColor = UIColor(self)
+        var h: CGFloat = 0
+        var s: CGFloat = 0
+        var b: CGFloat = 0
+        var a: CGFloat = 0
+        guard uiColor.getHue(&h, saturation: &s, brightness: &b, alpha: &a) else { return 0 }
+        return Double(h)
+    }
+
+    /// Độ bão hoà (0...1).
+    var saturation: Double {
+        let uiColor = UIColor(self)
+        var h: CGFloat = 0
+        var s: CGFloat = 0
+        var b: CGFloat = 0
+        var a: CGFloat = 0
+        guard uiColor.getHue(&h, saturation: &s, brightness: &b, alpha: &a) else { return 0 }
+        return Double(s)
+    }
+}

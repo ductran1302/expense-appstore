@@ -19,6 +19,8 @@ struct ExpenseArchive: Codable {
 
     struct CategoryPayload: Codable {
         let name: String
+        /// Khoá bản dịch, giữ nguyên khi nhập lại để danh mục dựng sẵn vẫn đổi ngôn ngữ.
+        let localizationKey: String?
         let symbol: String
         let colorHex: String
         let sortOrder: Int
@@ -56,6 +58,7 @@ struct ExpenseArchive: Codable {
             categories: categories.map {
                 CategoryPayload(
                     name: $0.name,
+                    localizationKey: $0.localizationKey,
                     symbol: $0.symbol,
                     colorHex: $0.colorHex,
                     sortOrder: $0.sortOrder
@@ -98,15 +101,24 @@ struct ExpenseArchive: Codable {
 /// Chuyển dữ liệu ra CSV để mở bằng Excel/Numbers.
 enum CSVExporter {
     /// Tạo nội dung CSV cho danh sách giao dịch.
-    static func makeCSV(transactions: [ExpenseTransaction]) -> String {
-        var lines = ["Ngày,Danh mục,Ghi chú,Số tiền"]
+    ///
+    /// - Parameters:
+    ///   - transactions: danh sách giao dịch.
+    ///   - header: dòng tiêu đề, lấy từ chuỗi đã dịch.
+    ///   - otherCategory: tên hiển thị cho giao dịch chưa có danh mục.
+    static func makeCSV(
+        transactions: [ExpenseTransaction],
+        header: String,
+        otherCategory: String
+    ) -> String {
+        var lines = [header]
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.dateFormat = "yyyy-MM-dd"
 
         for transaction in transactions.sorted(by: { $0.date > $1.date }) {
             let date = formatter.string(from: transaction.date)
-            let category = transaction.category?.name ?? "Khác"
+            let category = transaction.category?.name ?? otherCategory
             let note = escape(transaction.note)
             let amount = NSDecimalNumber(decimal: transaction.amount).stringValue
             lines.append("\(date),\(escape(category)),\(note),\(amount)")
@@ -154,10 +166,14 @@ enum ArchiveImporter {
                 existing.symbol = payload.symbol
                 existing.colorHex = payload.colorHex
                 existing.sortOrder = payload.sortOrder
+                if let key = payload.localizationKey {
+                    existing.localizationKey = key
+                }
                 continue
             }
             let category = ExpenseCategory(
                 name: payload.name,
+                localizationKey: payload.localizationKey,
                 symbol: payload.symbol,
                 colorHex: payload.colorHex,
                 isBuiltIn: false,

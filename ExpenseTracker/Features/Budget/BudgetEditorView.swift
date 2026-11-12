@@ -15,73 +15,80 @@ struct BudgetEditorView: View {
     @Query(sort: \MonthlyBudget.monthStart, order: .reverse) private var allBudgets: [MonthlyBudget]
 
     @State private var limitText = ""
-    @State private var selectedCategoryName: String?
+    @State private var selectedCategoryKey: String?
     @State private var month = Date.now
     @State private var didLoad = false
+    @FocusState private var isLimitFocused: Bool
 
     var body: some View {
         NavigationStack {
             Form {
                 if showsCategoryPicker {
-                    Section("Danh mục") {
-                        Picker("Danh mục", selection: $selectedCategoryName) {
-                            Text("Không có").tag(nil as String?)
+                    Section(L.budgetCategory) {
+                        Picker(selection: $selectedCategoryKey) {
+                            Text(L.noCategory).tag(nil as String?)
                             ForEach(categories) { category in
-                                Label(category.name, systemImage: category.symbol)
-                                    .tag(category.name as String?)
+                                Label(appState.categoryName(category), systemImage: category.symbol)
+                                    .tag(category.stableKey as String?)
                             }
                         }
                     }
                 }
 
-                Section("Hạn mức") {
-                    HStack(spacing: 8) {
+                Section(L.budgetLimit) {
+                    HStack(spacing: Spacing.sm) {
                         Text(CurrencyFormatter.symbol(for: appState.currencyCode))
                             .font(.title2.weight(.bold))
                             .foregroundStyle(AppTheme.accent)
 
                         TextField("0", text: $limitText)
-                            .font(.system(size: 32, weight: .bold, design: .rounded))
+                            .font(.system(.title2, design: .rounded, weight: .bold))
                             .keyboardType(.decimalPad)
                             .multilineTextAlignment(.leading)
+                            .foregroundStyle(AppTheme.accent)
+                            .focused($isLimitFocused)
                             .onChange(of: limitText) { _, newValue in
-                                limitText = sanitize(newValue)
+                                let sanitized = sanitize(newValue)
+                                if sanitized != newValue {
+                                    limitText = sanitized
+                                }
                             }
+                            .accessibilityLabel(L.budgetLimit)
                     }
-                    .padding(.vertical, 6)
+                    .padding(.vertical, Spacing.xs)
                 }
 
-                Section("Tháng áp dụng") {
+                Section(L.budgetMonth) {
                     DatePicker(
-                        "Tháng",
+                        L.budgetMonth,
                         selection: $month,
                         displayedComponents: .date
                     )
                     .datePickerStyle(.compact)
                 }
 
-                Section {
-                    HStack {
-                        Text("Hạn mức đã tồn tại cho tháng & danh mục này")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        Spacer()
-                        Text(existingConflict ? "Có" : "Không")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(existingConflict ? AppTheme.warning : AppTheme.success)
+                if existingConflict {
+                    Section {
+                        Label(L.budgetConflict, systemImage: "exclamationmark.triangle.fill")
+                            .font(.footnote)
+                            .foregroundStyle(AppTheme.warning)
                     }
                 }
             }
-            .navigationTitle(budget == nil ? "Thêm hạn mức" : "Sửa hạn mức")
+            .navigationTitle(budget == nil ? L.budgetEditorNew : L.budgetEditorEdit)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Huỷ") { dismiss() }
+                    Button(L.cancel) { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Lưu") { save() }
+                    Button(L.save) { save() }
                         .fontWeight(.semibold)
                         .disabled(parsedLimit == nil || existingConflict)
+                }
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button(L.done) { isLimitFocused = false }
                 }
             }
             .onAppear(perform: load)
@@ -96,26 +103,26 @@ struct BudgetEditorView: View {
     }
 
     private var isTotalTarget: Bool {
-        if let budget { return budget.category === nil }
+        if let budget { return budget.category == nil }
         return isTotal
     }
 
     /// Chỉ hiện ô chọn danh mục khi hạn mức gắn với một danh mục cụ thể.
     private var showsCategoryPicker: Bool {
-        if let budget { return budget.category !== nil }
+        if let budget { return budget.category != nil }
         return !isTotal
     }
 
     private var selectedCategory: ExpenseCategory? {
-        guard let name = selectedCategoryName else { return nil }
-        return categories.first { $0.name == name }
+        guard let key = selectedCategoryKey else { return nil }
+        return categories.first { $0.stableKey == key }
     }
 
     private var existingConflict: Bool {
         guard parsedLimit != nil else { return false }
         let targetMonth = month.startOfMonth
         let targetCategory = isTotalTarget ? nil : selectedCategory
-        let key = MonthlyBudget.makeKey(month: targetMonth, categoryName: targetCategory?.name)
+        let key = MonthlyBudget.makeKey(month: targetMonth, categoryKey: targetCategory?.stableKey)
         return allBudgets.contains { existing in
             guard existing.key == key else { return false }
             guard let budget else { return true }
@@ -144,12 +151,17 @@ struct BudgetEditorView: View {
         didLoad = true
 
         if let budget {
-            limitText = CurrencyFormatter.editString(budget.limit, code: appState.currencyCode)
-            selectedCategoryName = budget.category?.name
+            limitText = CurrencyFormatter.editString(
+                budget.limit,
+                code: appState.currencyCode,
+                locale: appState.locale
+            )
+            selectedCategoryKey = budget.category?.stableKey
             month = budget.monthStart
         } else {
             month = appState.selectedMonth
-            selectedCategoryName = isTotal ? nil : categories.first?.name
+            selectedCategoryKey = isTotal ? nil : categories.first?.stableKey
+            isLimitFocused = true
         }
     }
 

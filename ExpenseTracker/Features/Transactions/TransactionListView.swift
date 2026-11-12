@@ -17,63 +17,61 @@ struct TransactionListView: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
-                header
+            List {
+                heroSection
 
                 if filtered.isEmpty {
-                    emptyState
+                    emptySection
                 } else {
-                    List {
-                        ForEach(groupedDays) { group in
-                            Section {
-                                ForEach(group.transactions) { transaction in
-                                    Button {
-                                        editingTransaction = transaction
+                    ForEach(groupedDays) { group in
+                        Section {
+                            ForEach(group.transactions) { transaction in
+                                Button {
+                                    editingTransaction = transaction
+                                } label: {
+                                    TransactionRow(transaction: transaction)
+                                }
+                                .buttonStyle(.plain)
+                                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                    Button(role: .destructive) {
+                                        pendingDeletion = transaction
+                                        isShowingDeleteAlert = true
                                     } label: {
-                                        TransactionRow(transaction: transaction)
-                                    }
-                                    .buttonStyle(.plain)
-                                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                                        Button(role: .destructive) {
-                                            pendingDeletion = transaction
-                                            isShowingDeleteAlert = true
-                                        } label: {
-                                            Label("Xoá", systemImage: "trash")
-                                        }
+                                        Label(L.delete, systemImage: "trash")
                                     }
                                 }
-                            } header: {
-                                DayHeader(date: group.date, total: group.total)
                             }
+                        } header: {
+                            DayHeader(date: group.date, total: group.total)
                         }
                     }
-                    .listStyle(.insetGrouped)
                 }
             }
-            .navigationTitle("Giao dịch")
-            .navigationBarTitleDisplayMode(.inline)
-            .searchable(text: $searchText, prompt: "Tìm theo ghi chú hoặc danh mục")
+            .listStyle(.insetGrouped)
+            .navigationTitle(L.transactionsTitle)
+            .searchable(text: $searchText, prompt: L.searchPrompt)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Menu {
-                        Picker("Danh mục", selection: $filter) {
-                            Label(CategoryFilter.all.title, systemImage: CategoryFilter.all.symbol)
+                        Picker(selection: $filter) {
+                            Label(L.filterAll, systemImage: CategoryFilter.all.symbol)
                                 .tag(CategoryFilter.all)
                             ForEach(categories) { category in
-                                Label(category.name, systemImage: category.symbol)
-                                    .tag(CategoryFilter.category(category.name))
+                                Label(appState.categoryName(category), systemImage: category.symbol)
+                                    .tag(CategoryFilter.category(category.stableKey))
                             }
                         }
                     } label: {
-                        Label(filter.title, systemImage: filter.symbol)
-                            .font(.subheadline)
+                        Label(filterTitle, systemImage: filter.symbol)
+                            .font(.subheadline.weight(.medium))
                     }
+                    .accessibilityLabel(L.filterCategory)
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         isAdding = true
                     } label: {
-                        Image(systemName: "plus")
+                        Label(L.addTitle, systemImage: "plus")
                     }
                 }
             }
@@ -83,61 +81,113 @@ struct TransactionListView: View {
             .sheet(item: $editingTransaction) { transaction in
                 TransactionEditorView(transaction: transaction)
             }
-            .alert("Xoá giao dịch?", isPresented: $isShowingDeleteAlert) {
-                Button("Xoá", role: .destructive) {
+            .alert(L.deleteTitle, isPresented: $isShowingDeleteAlert) {
+                Button(L.delete, role: .destructive) {
                     if let pendingDeletion {
                         context.delete(pendingDeletion)
                         try? context.save()
                     }
                     pendingDeletion = nil
                 }
-                Button("Huỷ", role: .cancel) {
+                Button(L.cancel, role: .cancel) {
                     pendingDeletion = nil
                 }
             } message: {
-                Text("Giao dịch sẽ bị xoá vĩnh viễn.")
+                Text(L.deleteMessage)
             }
         }
     }
 
-    // MARK: - Header
+    // MARK: - Hero
 
-    private var header: some View {
-        VStack(spacing: 12) {
-            MonthPicker(month: appState.monthBinding)
+    /// Khối tổng quan đầu màn hình: tổng chi tháng là điểm nhấn chính,
+    /// thông tin phụ xếp bên dưới theo thứ bạch để không cạnh tranh chú ý.
+    private var heroSection: some View {
+        Section {
+            VStack(alignment: .leading, spacing: Spacing.lg) {
+                MonthPicker(month: appState.monthBinding)
 
-            HStack(spacing: 10) {
-                StatTile(
-                    title: "Tổng chi",
-                    value: appState.format(totalSpent),
-                    caption: "\(filtered.count) giao dịch",
-                    tint: AppTheme.expense,
-                    systemImage: "arrow.up.right"
-                )
-                StatTile(
-                    title: "Trung bình/ngày",
-                    value: appState.format(averagePerDay),
-                    caption: "theo tháng này",
-                    tint: AppTheme.accent,
-                    systemImage: "calendar"
-                )
+                VStack(alignment: .leading, spacing: Spacing.xs) {
+                    Text(L.totalSpent)
+                        .font(.footnote.weight(.medium))
+                        .foregroundStyle(AppTheme.textSecondary)
+
+                    Text(appState.format(totalSpent))
+                        .font(.system(.largeTitle, design: .rounded, weight: .bold))
+                        .foregroundStyle(AppTheme.textPrimary)
+                        .contentTransition(.numericText())
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.5)
+                        .accessibilityLabel(L.totalSpent)
+                        .accessibilityValue(appState.format(totalSpent))
+                }
+
+                HStack(spacing: Spacing.lg) {
+                    metric(
+                        title: L.dailyAverage,
+                        value: appState.format(averagePerDay),
+                        systemImage: "calendar"
+                    )
+                    metric(
+                        title: L.dataTransactions,
+                        value: "\(filtered.count)",
+                        systemImage: "list.bullet"
+                    )
+                    Spacer(minLength: 0)
+                }
             }
-            .padding(.horizontal, 16)
-            .padding(.bottom, 4)
+            .padding(.vertical, Spacing.xs)
+            .listRowInsets(EdgeInsets(top: Spacing.sm, leading: Spacing.lg, bottom: Spacing.lg, trailing: Spacing.lg))
+            .listRowBackground(Color.clear)
         }
-        .padding(.top, 8)
     }
 
-    private var emptyState: some View {
-        ContentUnavailableView {
-            Label("Chưa có giao dịch", systemImage: "tray")
-        } description: {
-            Text(searchText.isEmpty
-                 ? "Thêm giao dịch đầu tiên để bắt đầu theo dõi chi tiêu."
-                 : "Không tìm thấy giao dịch phù hợp.")
-        } actions: {
-            Button("Thêm giao dịch") { isAdding = true }
-                .buttonStyle(.borderedProminent)
+    private func metric(title: LocalizedStringKey, value: String, systemImage: String) -> some View {
+        VStack(alignment: .leading, spacing: Spacing.xxs) {
+            Label(title, systemImage: systemImage)
+                .font(.caption)
+                .foregroundStyle(AppTheme.textSecondary)
+                .labelStyle(.titleAndIcon)
+            Text(value)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(AppTheme.textPrimary)
+                .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    // MARK: - Empty state
+
+    private var emptySection: some View {
+        Section {
+            VStack(spacing: Spacing.md) {
+                Image(systemName: searchText.isEmpty ? "tray" : "magnifyingglass")
+                    .font(.system(size: 40, weight: .light))
+                    .foregroundStyle(AppTheme.textTertiary)
+
+                VStack(spacing: Spacing.xs) {
+                    Text(searchText.isEmpty ? L.emptyTitle : L.emptySearchTitle)
+                        .font(.headline)
+                        .foregroundStyle(AppTheme.textPrimary)
+                    Text(searchText.isEmpty ? L.emptyMessage : L.emptySearchMessage)
+                        .font(.subheadline)
+                        .foregroundStyle(AppTheme.textSecondary)
+                        .multilineTextAlignment(.center)
+                }
+
+                if searchText.isEmpty {
+                    Button(action: { isAdding = true }) {
+                        Label(L.emptyAction, systemImage: "plus.circle.fill")
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, Spacing.xxl)
+            .listRowBackground(Color.clear)
+            .listRowSeparator(.hidden)
         }
     }
 
@@ -154,18 +204,29 @@ struct TransactionListView: View {
             switch filter {
             case .all:
                 break
-            case .category(let name):
-                guard transaction.category?.name == name else { return false }
+            case .category(let key):
+                guard transaction.category?.stableKey == key else { return false }
             }
 
             guard !query.isEmpty else { return true }
             return transaction.note.localizedCaseInsensitiveContains(query)
-                || (transaction.category?.name.localizedCaseInsensitiveContains(query) ?? false)
+                || (transaction.category.map { appState.categoryName($0).localizedCaseInsensitiveContains(query) } ?? false)
         }
     }
 
     private var totalSpent: Decimal {
         filtered.reduce(Decimal.zero) { $0 + max($1.amount, 0) }
+    }
+
+    /// Nhãn hiển thị của bộ lọc đang chọn.
+    private var filterTitle: String {
+        switch filter {
+        case .all:
+            return appState.string("transactions.filterAll")
+        case .category(let key):
+            return categories.first { $0.stableKey == key }
+                .map { appState.categoryName($0) } ?? appState.string("transactions.filterAll")
+        }
     }
 
     private var averagePerDay: Decimal {
@@ -206,13 +267,19 @@ private struct DayHeader: View {
 
     var body: some View {
         HStack {
-            Text(date.formatted(.dateTime.weekday(.wide).day().month()))
+            Text(appState.dayTitle(date))
                 .font(.subheadline.weight(.semibold))
+                .foregroundStyle(AppTheme.textPrimary)
             Spacer()
             Text(appState.format(total))
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(AppTheme.textSecondary)
+                .monospacedDigit()
         }
+        .textCase(nil)
+        // Section header không nhận `listRowInsets`, nên tự canh lề.
+        .padding(.horizontal, Spacing.lg)
+        .padding(.vertical, Spacing.xs)
     }
 }
 
@@ -222,13 +289,6 @@ private struct DayHeader: View {
 enum CategoryFilter: Hashable {
     case all
     case category(String)
-
-    var title: String {
-        switch self {
-        case .all: return "Tất cả"
-        case .category(let name): return name
-        }
-    }
 
     var symbol: String {
         switch self {

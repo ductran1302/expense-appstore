@@ -4,11 +4,14 @@ import SwiftData
 struct CategoryManagerView: View {
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
+    @Environment(AppState.self) private var appState
 
     @Query(sort: \ExpenseCategory.sortOrder) private var categories: [ExpenseCategory]
 
     @State private var editingCategory: ExpenseCategory?
     @State private var isAdding = false
+    @State private var isShowingDeleteAlert = false
+    @State private var pendingDeletions: [ExpenseCategory] = []
 
     var body: some View {
         List {
@@ -16,41 +19,7 @@ struct CategoryManagerView: View {
                 Button {
                     editingCategory = category
                 } label: {
-                    HStack(spacing: 12) {
-                        ZStack {
-                            Circle()
-                                .fill(Color(hex: category.colorHex).opacity(0.16))
-                                .frame(width: 38, height: 38)
-                            Image(systemName: category.symbol)
-                                .font(.system(size: 15, weight: .semibold))
-                                .foregroundStyle(Color(hex: category.colorHex))
-                        }
-
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(category.name)
-                                .font(.subheadline.weight(.medium))
-                                .foregroundStyle(.primary)
-                            Text("\(category.transactions.count) giao dịch")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-
-                        Spacer()
-
-                        if category.isBuiltIn {
-                            Text("Mặc định")
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 3)
-                                .background(Color(.tertiarySystemFill), in: Capsule())
-                        }
-
-                        Image(systemName: "chevron.right")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.tertiary)
-                    }
-                    .contentShape(Rectangle())
+                    row(category)
                 }
                 .buttonStyle(.plain)
             }
@@ -60,10 +29,10 @@ struct CategoryManagerView: View {
             Button {
                 isAdding = true
             } label: {
-                Label("Thêm danh mục", systemImage: "plus.circle.fill")
+                Label(L.categoriesAdd, systemImage: "plus.circle.fill")
             }
         }
-        .navigationTitle("Danh mục")
+        .navigationTitle(L.categoriesTitle)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar { EditButton() }
         .sheet(isPresented: $isAdding) {
@@ -72,6 +41,56 @@ struct CategoryManagerView: View {
         .sheet(item: $editingCategory) { category in
             CategoryEditorView(category: category)
         }
+        .alert(L.categoriesDeleteConfirm, isPresented: $isShowingDeleteAlert) {
+            Button(L.delete, role: .destructive) {
+                for category in pendingDeletions {
+                    context.delete(category)
+                }
+                try? context.save()
+                pendingDeletions = []
+            }
+            Button(L.cancel, role: .cancel) {
+                pendingDeletions = []
+            }
+        } message: {
+            Text(L.categoriesDeleteMessage)
+        }
+    }
+
+    private func row(_ category: ExpenseCategory) -> some View {
+        HStack(spacing: Spacing.md) {
+            CategoryIconView(category: category, size: 36)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(appState.categoryName(category))
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(AppTheme.textPrimary)
+                Text(L.categoryCount(
+                    category.transactions.count,
+                    bundle: appState.localizationBundle,
+                    locale: appState.locale
+                ))
+                .font(.caption)
+                .foregroundStyle(AppTheme.textSecondary)
+            }
+
+            Spacer()
+
+            if category.isBuiltIn {
+                Text(L.categoriesBuiltin)
+                    .font(.caption2)
+                    .foregroundStyle(AppTheme.textSecondary)
+                    .padding(.horizontal, Spacing.sm)
+                    .padding(.vertical, Spacing.xxs)
+                    .background(AppTheme.fill, in: Capsule())
+            }
+
+            Image(systemName: "chevron.right")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(AppTheme.textTertiary)
+        }
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
     }
 
     private func move(from source: IndexSet, to destination: Int) {
@@ -84,13 +103,36 @@ struct CategoryManagerView: View {
     }
 
     private func delete(at offsets: IndexSet) {
-        for index in offsets {
-            let category = categories[index]
-            // Danh mục mặc định được giữ lại để app luôn có danh mục dự phòng.
-            guard !category.isBuiltIn else { continue }
-            context.delete(category)
+        // Danh mục mặc định được giữ lại để app luôn có danh mục dự phòng.
+        pendingDeletions = offsets
+            .map { categories[$0] }
+            .filter { !$0.isBuiltIn }
+        guard !pendingDeletions.isEmpty else { return }
+        isShowingDeleteAlert = true
+    }
+}
+
+/// Biểu tượng danh mục, tự đổi độ tương phản theo giao diện.
+struct CategoryIconView: View {
+    let category: ExpenseCategory
+    var size: CGFloat = 40
+
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var tint: CategoryColor {
+        CategoryColor(hex: category.colorHex, scheme: colorScheme)
+    }
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .fill(tint.soft)
+                .frame(width: size, height: size)
+            Image(systemName: category.symbol)
+                .font(.system(size: size * 0.4, weight: .semibold))
+                .foregroundStyle(tint.base)
         }
-        try? context.save()
+        .accessibilityHidden(true)
     }
 }
 
@@ -101,6 +143,7 @@ struct CategoryEditorView: View {
 
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme
 
     @State private var name = ""
     @State private var symbol = "tag.fill"
@@ -117,7 +160,7 @@ struct CategoryEditorView: View {
     private let symbols: [String] = [
         "fork.knife", "car.fill", "bag.fill", "bolt.fill", "heart.fill",
         "gamecontroller.fill", "book.fill", "house.fill", "gift.fill",
-        "airplane", "pawprint.fill", "cup.and.saucer.fill", "gift", "banknote.fill",
+        "airplane", "pawprint.fill", "cup.and.saucer.fill", "banknote.fill",
         "creditcard.fill", "wifi", "dumbbell.fill", "bicycle", "bus.fill",
         "tshirt.fill", "drop.fill", "leaf.fill", "phone.fill", "questionmark.circle.fill"
     ]
@@ -125,12 +168,13 @@ struct CategoryEditorView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Tên") {
-                    TextField("Tên danh mục", text: $name)
+                Section(L.categoriesName) {
+                    TextField(L.categoriesNamePlaceholder, text: $name)
+                        .accessibilityLabel(L.categoriesName)
                 }
 
-                Section("Biểu tượng") {
-                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 6), spacing: 10) {
+                Section(L.categoriesIcon) {
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: Spacing.md), count: 6), spacing: Spacing.md) {
                         ForEach(symbols, id: \.self) { item in
                             Button {
                                 symbol = item
@@ -140,18 +184,19 @@ struct CategoryEditorView: View {
                                     .frame(width: 40, height: 40)
                                     .background(
                                         Circle()
-                                            .fill(symbol == item ? color : Color(.tertiarySystemGroupedBackground))
+                                            .fill(symbol == item ? color : AppTheme.surfaceRaised)
                                     )
-                                    .foregroundStyle(symbol == item ? .white : Color.primary)
+                                    .foregroundStyle(symbol == item ? .white : AppTheme.textPrimary)
                             }
                             .buttonStyle(.plain)
+                            .accessibilityLabel(item)
                         }
                     }
-                    .padding(.vertical, 4)
+                    .padding(.vertical, Spacing.xs)
                 }
 
-                Section("Màu") {
-                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 5), spacing: 10) {
+                Section(L.categoriesColor) {
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: Spacing.md), count: 5), spacing: Spacing.md) {
                         ForEach(palette, id: \.self) { hex in
                             Button {
                                 color = Color(hex: hex)
@@ -168,27 +213,20 @@ struct CategoryEditorView: View {
                                     }
                             }
                             .buttonStyle(.plain)
+                            .accessibilityLabel(hex)
                         }
                     }
-                    .padding(.vertical, 4)
-                }
-
-                if let category, !category.transactions.isEmpty {
-                    Section {
-                        LabeledContent("Số giao dịch", value: "\(category.transactions.count)")
-                    } footer: {
-                        Text("Khi xoá danh mục, các giao dịch liên quan sẽ được giữ nhưng mất danh mục.")
-                    }
+                    .padding(.vertical, Spacing.xs)
                 }
             }
-            .navigationTitle(category == nil ? "Thêm danh mục" : "Sửa danh mục")
+            .navigationTitle(category == nil ? L.categoriesAdd : L.categoriesEdit)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Huỷ") { dismiss() }
+                    Button(L.cancel) { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Lưu") { save() }
+                    Button(L.save) { save() }
                         .fontWeight(.semibold)
                         .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
@@ -217,13 +255,12 @@ struct CategoryEditorView: View {
             category.symbol = symbol
             category.colorHex = color.hexString
         } else {
-            let maxOrder = categoriesMaxOrder()
             let newCategory = ExpenseCategory(
                 name: trimmed,
                 symbol: symbol,
                 colorHex: color.hexString,
                 isBuiltIn: false,
-                sortOrder: maxOrder + 1
+                sortOrder: categoriesMaxOrder() + 1
             )
             context.insert(newCategory)
         }
@@ -233,7 +270,9 @@ struct CategoryEditorView: View {
     }
 
     private func categoriesMaxOrder() -> Int {
-        let descriptor = FetchDescriptor<ExpenseCategory>(sortBy: [SortDescriptor(\ExpenseCategory.sortOrder, order: .reverse)])
+        let descriptor = FetchDescriptor<ExpenseCategory>(
+            sortBy: [SortDescriptor(\ExpenseCategory.sortOrder, order: .reverse)]
+        )
         let all = (try? context.fetch(descriptor)) ?? []
         return all.first?.sortOrder ?? 0
     }

@@ -32,6 +32,10 @@ struct ExpenseTrackerApp: App {
         WindowGroup {
             RootView()
                 .environment(appState)
+                // Đặt locale ở gốc để mọi `LocalizedStringKey` dùng ngôn ngữ đã chọn.
+                .environment(\.locale, appState.locale)
+                // `nil` = theo hệ thống.
+                .preferredColorScheme(appState.appearance.colorScheme)
         }
         .modelContainer(container)
     }

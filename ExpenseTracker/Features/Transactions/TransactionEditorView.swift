@@ -8,15 +8,17 @@ struct TransactionEditorView: View {
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
     @Environment(AppState.self) private var appState
+    @Environment(\.colorScheme) private var colorScheme
 
     @Query(sort: \ExpenseCategory.sortOrder) private var categories: [ExpenseCategory]
 
     @State private var amountText = ""
     @State private var note = ""
     @State private var date = Date.now
-    @State private var selectedCategoryName: String?
+    @State private var selectedCategoryKey: String?
     @State private var kind: TransactionKind = .expense
     @State private var didLoad = false
+    @FocusState private var isAmountFocused: Bool
 
     enum TransactionKind: String, CaseIterable, Identifiable {
         case expense
@@ -24,10 +26,10 @@ struct TransactionEditorView: View {
 
         var id: String { rawValue }
 
-        var title: String {
+        var title: LocalizedStringKey {
             switch self {
-            case .expense: return "Chi tiêu"
-            case .income: return "Thu nhập"
+            case .expense: return L.typeExpense
+            case .income: return L.typeIncome
             }
         }
 
@@ -50,61 +52,74 @@ struct TransactionEditorView: View {
         NavigationStack {
             Form {
                 Section {
-                    Picker("Loại", selection: $kind) {
+                    Picker(selection: $kind) {
                         ForEach(TransactionKind.allCases) { item in
                             Label(item.title, systemImage: item.symbol).tag(item)
                         }
                     }
                     .pickerStyle(.segmented)
-                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                    .listRowInsets(EdgeInsets(top: Spacing.sm, leading: Spacing.lg, bottom: Spacing.sm, trailing: Spacing.lg))
                 }
 
-                Section("Số tiền") {
-                    HStack(spacing: 8) {
+                Section(L.amount) {
+                    HStack(spacing: Spacing.sm) {
                         Text(CurrencyFormatter.symbol(for: appState.currencyCode))
                             .font(.title2.weight(.bold))
                             .foregroundStyle(kind.tint)
 
-                        TextField("0", text: $amountText)
-                            .font(.system(size: 34, weight: .bold, design: .rounded))
+                        TextField(L.amountPlaceholder, text: $amountText)
+                            .font(.system(.title, design: .rounded, weight: .bold))
                             .keyboardType(.decimalPad)
                             .multilineTextAlignment(.leading)
                             .foregroundStyle(kind.tint)
+                            .focused($isAmountFocused)
                             .onChange(of: amountText) { _, newValue in
-                                guard !newValue.isEmpty else { return }
-                                amountText = sanitize(newValue)
+                                let sanitized = sanitize(newValue)
+                                if sanitized != newValue {
+                                    amountText = sanitized
+                                }
                             }
+                            .accessibilityLabel(L.amount)
                     }
-                    .padding(.vertical, 6)
+                    .padding(.vertical, Spacing.xs)
                 }
 
-                Section("Danh mục") {
-                    Picker("Danh mục", selection: $selectedCategoryName) {
-                        Text("Không có").tag(nil as String?)
+                Section(L.category) {
+                    Picker(selection: $selectedCategoryKey) {
+                        Text(L.noCategory).tag(nil as String?)
                         ForEach(categories) { category in
-                            Label(category.name, systemImage: category.symbol)
-                                .tag(category.name as String?)
+                            Label(appState.categoryName(category), systemImage: category.symbol)
+                                .tag(category.stableKey as String?)
                         }
                     }
                 }
 
-                Section("Chi tiết") {
-                    DatePicker("Ngày", selection: $date, displayedComponents: [.date, .hourAndMinute])
+                Section(L.details) {
+                    DatePicker(
+                        L.date,
+                        selection: $date,
+                        displayedComponents: [.date, .hourAndMinute]
+                    )
 
-                    TextField("Ghi chú (không bắt buộc)", text: $note, axis: .vertical)
+                    TextField(L.notePlaceholder, text: $note, axis: .vertical)
                         .lineLimit(1...3)
+                        .accessibilityLabel(L.note)
                 }
             }
-            .navigationTitle(transaction == nil ? "Thêm giao dịch" : "Sửa giao dịch")
+            .navigationTitle(transaction == nil ? L.addTitle : L.editTitle)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Huỷ") { dismiss() }
+                    Button(L.cancel) { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Lưu") { save() }
+                    Button(L.save) { save() }
                         .fontWeight(.semibold)
                         .disabled(parsedAmount == nil)
+                }
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button(L.done) { isAmountFocused = false }
                 }
             }
             .onAppear(perform: load)
@@ -114,13 +129,13 @@ struct TransactionEditorView: View {
     // MARK: - Helpers
 
     private var parsedAmount: Decimal? {
-        guard let amount = DecimalParser.parse(amountText) else { return nil }
-        return kind == .expense ? abs(amount) : -abs(amount)
+        guard let amount = DecimalParser.parse(amountText), amount > 0 else { return nil }
+        return kind == .expense ? amount : -amount
     }
 
     private var selectedCategory: ExpenseCategory? {
-        guard let name = selectedCategoryName else { return nil }
-        return categories.first { $0.name == name }
+        guard let key = selectedCategoryKey else { return nil }
+        return categories.first { $0.stableKey == key }
     }
 
     private func sanitize(_ text: String) -> String {
@@ -144,14 +159,19 @@ struct TransactionEditorView: View {
         didLoad = true
 
         if let transaction {
-            amountText = CurrencyFormatter.editString(abs(transaction.amount), code: appState.currencyCode)
+            amountText = CurrencyFormatter.editString(
+                abs(transaction.amount),
+                code: appState.currencyCode,
+                locale: appState.locale
+            )
             note = transaction.note
             date = transaction.date
-            selectedCategoryName = transaction.category?.name
+            selectedCategoryKey = transaction.category?.stableKey
             kind = transaction.amount < 0 ? .income : .expense
         } else {
-            selectedCategoryName = categories.first?.name
+            selectedCategoryKey = categories.first?.stableKey
             date = Date.now
+            isAmountFocused = true
         }
     }
 

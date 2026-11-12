@@ -14,22 +14,38 @@ struct SettingsView: View {
     @State private var isExportingCSV = false
     @State private var isImporting = false
     @State private var exportDocument = ExportDocument(data: Data())
-    @State private var isShowingImportAlert = false
-    @State private var importMessage = ""
-    @State private var isShowingClearAlert = false
-    @State private var isShowingSampleAlert = false
+    @State private var activeAlert: SettingsAlert?
+
+    /// Một alert duy nhất cho cả màn hình.
+    ///
+    /// SwiftUI chỉ kích hoạt `.alert` cuối cùng gắn vào một view, nên các
+    /// hộp thoại phải dùng chung một cơ chế thay vì nhiều modifier `.alert`.
+    enum SettingsAlert: Identifiable {
+        case message(LocalizedStringKey, String)
+        case erase
+        case sample
+
+        var id: String {
+            switch self {
+            case .message(let title, _): return "message-\(String(describing: title))"
+            case .erase: return "erase"
+            case .sample: return "sample"
+            }
+        }
+    }
 
     var body: some View {
         NavigationStack {
             List {
+                appearanceSection
+                languageSection
                 currencySection
                 dataSection
                 backupSection
-                categorySection
+                categoriesSection
                 aboutSection
             }
-            .navigationTitle("Cài đặt")
-            .navigationBarTitleDisplayMode(.inline)
+            .navigationTitle(L.settingsTitle)
             .fileExporter(
                 isPresented: $isExportingJSON,
                 document: exportDocument,
@@ -42,7 +58,7 @@ struct SettingsView: View {
                 isPresented: $isExportingCSV,
                 document: exportDocument,
                 contentType: .commaSeparatedText,
-                defaultFilename: "expense-tracker-giao-dich"
+                defaultFilename: "expense-tracker-transactions"
             ) { result in
                 handleExportResult(result)
             }
@@ -53,31 +69,58 @@ struct SettingsView: View {
             ) { result in
                 handleImportResult(result)
             }
-            .alert("Nhập dữ liệu", isPresented: $isShowingImportAlert) {
-                Button("OK", role: .cancel) {}
-            } message: {
-                Text(importMessage)
-            }
-            .alert("Xoá toàn bộ dữ liệu?", isPresented: $isShowingClearAlert) {
-                Button("Xoá tất cả", role: .destructive) { clearAllData() }
-                Button("Huỷ", role: .cancel) {}
-            } message: {
-                Text("Toàn bộ giao dịch, hạn mức và danh mục tự tạo sẽ bị xoá. Không thể hoàn tác.")
-            }
-            .alert("Thêm dữ liệu mẫu?", isPresented: $isShowingSampleAlert) {
-                Button("Thêm", role: .none) { addSampleData() }
-                Button("Huỷ", role: .cancel) {}
-            } message: {
-                Text("Sẽ thêm khoảng 25 giao dịch mẫu trong 45 ngày gần nhất để bạn xem thử biểu đồ.")
+            .alert(item: $activeAlert) { alert in
+                switch alert {
+                case .message(let title, let message):
+                    Alert(title: title, message: Text(message), dismissButton: .default(Text(L.done)))
+                case .erase:
+                    Alert(
+                        title: L.dataEraseTitle,
+                        message: Text(L.dataEraseMessage),
+                        primaryButton: .destructive(Text(L.dataEraseConfirm)) { clearAllData() },
+                        secondaryButton: .cancel(Text(L.cancel))
+                    )
+                case .sample:
+                    Alert(
+                        title: L.dataSample,
+                        message: Text(L.dataSampleHint),
+                        primaryButton: .default(Text(L.add)) { addSampleData() },
+                        secondaryButton: .cancel(Text(L.cancel))
+                    )
+                }
             }
         }
     }
 
     // MARK: - Sections
 
+    private var appearanceSection: some View {
+        Section(L.sectionAppearance) {
+            Picker(selection: appState.appearanceBinding) {
+                ForEach(AppAppearance.allCases) { option in
+                    Text(option.displayName).tag(option)
+                }
+            }
+            .pickerStyle(.segmented)
+            .listRowInsets(EdgeInsets(top: Spacing.sm, leading: Spacing.lg, bottom: Spacing.sm, trailing: Spacing.lg))
+        }
+    }
+
+    private var languageSection: some View {
+        Section(L.sectionLanguage) {
+            Picker(selection: appState.languageBinding) {
+                ForEach(AppLanguage.allCases) { option in
+                    Text(option.displayName).tag(option)
+                }
+            }
+            .pickerStyle(.segmented)
+            .listRowInsets(EdgeInsets(top: Spacing.sm, leading: Spacing.lg, bottom: Spacing.sm, trailing: Spacing.lg))
+        }
+    }
+
     private var currencySection: some View {
-        Section("Tiền tệ") {
-            Picker("Loại tiền", selection: appState.currencyBinding) {
+        Section(L.sectionCurrency) {
+            Picker(selection: appState.currencyBinding) {
                 ForEach(CurrencyFormatter.supported) { item in
                     Text(item.name).tag(item.code)
                 }
@@ -86,21 +129,21 @@ struct SettingsView: View {
     }
 
     private var dataSection: some View {
-        Section("Dữ liệu") {
-            LabeledContent("Giao dịch", value: "\(transactions.count)")
-            LabeledContent("Danh mục", value: "\(categories.count)")
-            LabeledContent("Hạn mức", value: "\(budgets.count)")
+        Section(L.sectionData) {
+            LabeledContent(L.dataTransactions, value: "\(transactions.count)")
+            LabeledContent(L.dataCategories, value: "\(categories.count)")
+            LabeledContent(L.dataBudgets, value: "\(budgets.count)")
 
             Button {
-                isShowingSampleAlert = true
+                activeAlert = .sample
             } label: {
-                Label("Thêm dữ liệu mẫu", systemImage: "wand.and.stars")
+                Label(L.dataSample, systemImage: "wand.and.stars")
             }
 
             Button(role: .destructive) {
-                isShowingClearAlert = true
+                activeAlert = .erase
             } label: {
-                Label("Xoá toàn bộ dữ liệu", systemImage: "trash")
+                Label(L.dataErase, systemImage: "trash")
             }
         }
     }
@@ -110,45 +153,45 @@ struct SettingsView: View {
             Button {
                 exportJSON()
             } label: {
-                Label("Sao lưu JSON (toàn bộ)", systemImage: "arrow.down.doc")
+                Label(L.backupJSON, systemImage: "arrow.down.doc")
             }
 
             Button {
                 exportCSV()
             } label: {
-                Label("Xuất CSV (giao dịch)", systemImage: "tablecells")
+                Label(L.backupCSV, systemImage: "tablecells")
             }
 
             Button {
                 isImporting = true
             } label: {
-                Label("Nhập từ file JSON", systemImage: "arrow.up.doc")
+                Label(L.backupImport, systemImage: "arrow.up.doc")
             }
         } header: {
-            Text("Sao lưu & khôi phục")
+            Text(L.sectionBackup)
         } footer: {
-            Text("File JSON chứa toàn bộ danh mục, giao dịch và hạn mức. File CSV mở được bằng Excel hoặc Numbers.")
+            Text(L.backupHint)
         }
     }
 
-    private var categorySection: some View {
-        Section("Danh mục") {
+    private var categoriesSection: some View {
+        Section(L.sectionCategories) {
             NavigationLink {
                 CategoryManagerView()
             } label: {
-                Label("Quản lý danh mục chi tiêu", systemImage: "tag.fill")
+                Label(L.manageCategories, systemImage: "tag.fill")
             }
         }
     }
 
     private var aboutSection: some View {
         Section {
-            LabeledContent("Phiên bản", value: appVersion)
-            LabeledContent("Dữ liệu", value: "Trên thiết bị này")
+            LabeledContent(L.aboutVersion, value: appVersion)
+            LabeledContent(L.aboutStorage, value: "")
         } header: {
-            Text("Thông tin")
+            Text(L.sectionAbout)
         } footer: {
-            Text("Toàn bộ dữ liệu được lưu cục bộ trên iPhone. App không gửi thông tin lên internet.")
+            Text(L.aboutPrivacy)
         }
     }
 
@@ -172,19 +215,19 @@ struct SettingsView: View {
     }
 
     private func exportCSV() {
-        let csv = CSVExporter.makeCSV(transactions: transactions)
+        let csv = CSVExporter.makeCSV(
+            transactions: transactions,
+            header: appState.string("csv.header"),
+            otherCategory: appState.string("category.other")
+        )
         guard let data = csv.data(using: .utf8) else { return }
         exportDocument = ExportDocument(data: data)
         isExportingCSV = true
     }
 
     private func handleExportResult(_ result: Result<URL, Error>) {
-        switch result {
-        case .success:
-            break
-        case .failure:
-            importMessage = "Không xuất được file. Vui lòng thử lại."
-            isShowingImportAlert = true
+        if case .failure = result {
+            activeAlert = .message(L.sectionBackup, appState.string("settings.export.failed"))
         }
     }
 
@@ -200,14 +243,15 @@ struct SettingsView: View {
                 let data = try Data(contentsOf: url)
                 let archive = try ExpenseArchive.decode(data: data)
                 let summary = ArchiveImporter.importArchive(archive, into: context)
-                importMessage = summary.summary
+                activeAlert = .message(
+                    L.sectionBackup,
+                    appState.string("settings.import.success", arguments: summary.transactionsAdded)
+                )
             } catch {
-                importMessage = "Không đọc được file. Hãy chọn file JSON do app xuất ra."
+                activeAlert = .message(L.sectionBackup, appState.string("settings.import.failed"))
             }
-            isShowingImportAlert = true
         case .failure:
-            importMessage = "Không nhập được file. Vui lòng thử lại."
-            isShowingImportAlert = true
+            activeAlert = .message(L.sectionBackup, appState.string("settings.import.failed"))
         }
     }
 

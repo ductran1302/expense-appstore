@@ -18,31 +18,34 @@ struct RootView: View {
         TabView(selection: $selectedTab) {
             TransactionListView()
                 .tabItem {
-                    Label("Giao dịch", systemImage: "list.bullet.rectangle.portrait")
+                    Label(L.tabTransactions, systemImage: "list.bullet.rectangle.portrait")
                 }
                 .tag(Tab.transactions)
 
             StatsView()
                 .tabItem {
-                    Label("Thống kê", systemImage: "chart.pie.fill")
+                    Label(L.tabStats, systemImage: "chart.pie.fill")
                 }
                 .tag(Tab.stats)
 
             BudgetView()
                 .tabItem {
-                    Label("Ngân sách", systemImage: "target")
+                    Label(L.tabBudget, systemImage: "target")
                 }
                 .tag(Tab.budget)
 
             SettingsView()
                 .tabItem {
-                    Label("Cài đặt", systemImage: "gearshape.fill")
+                    Label(L.tabSettings, systemImage: "gearshape.fill")
                 }
                 .tag(Tab.settings)
         }
+        .tint(AppTheme.accent)
         .task {
             guard !didSeed else { return }
             didSeed = true
+            // Vá khoá bản dịch cho danh mục tạo từ phiên bản trước.
+            SeedData.backfillLocalizationKeys(in: context)
             SeedData.createDefaultCategories(in: context)
         }
     }

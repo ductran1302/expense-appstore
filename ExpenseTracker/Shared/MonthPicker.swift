@@ -1,49 +1,70 @@
 import SwiftUI
 
 /// Thanh chọn tháng dùng chung.
+///
+/// Nút có vùng chạm 44pt theo HIG, tiêu đề dùng text style để đáp ứng
+/// Dynamic Type, và việc đổi tháng có animation nhẹ.
 struct MonthPicker: View {
     @Binding var month: Date
-    var canGoForward: Bool = true
+    /// Cho phép xem các tháng trong tương lai. Mặc định là không.
+    var allowsFutureMonths: Bool = false
 
-    private var title: String {
-        month.formatted(.dateTime.month(.wide).year())
+    @Environment(AppState.self) private var appState
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    /// Tháng hiện tại, dùng để chặn chuyển sang tương lai.
+    private var currentMonth: Date {
+        Date.now.startOfMonth
+    }
+
+    /// Không cho đi quá tháng hiện tại trừ khi được cho phép.
+    private var canGoForward: Bool {
+        allowsFutureMonths || month < currentMonth
     }
 
     var body: some View {
-        HStack(spacing: 8) {
-            Button {
-                withAnimation(.snappy) { month = month.addingMonths(-1) }
-            } label: {
-                Image(systemName: "chevron.left")
-                    .font(.subheadline.weight(.semibold))
-                    .frame(width: 34, height: 34)
-                    .background(Color(.tertiarySystemGroupedBackground), in: Circle())
+        HStack(spacing: Spacing.sm) {
+            CircleIconButton(
+                systemImage: "chevron.left",
+                accessibilityLabel: appState.string("common.previousMonth")
+            ) {
+                step(-1)
             }
-            .buttonStyle(.plain)
 
             Spacer(minLength: 0)
 
-            Text(title)
+            Text(appState.monthTitle(month))
                 .font(.headline)
+                .foregroundStyle(AppTheme.textPrimary)
                 .contentTransition(.numericText())
-                .frame(minWidth: 150)
+                .multilineTextAlignment(.center)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+                .accessibilityAddTraits(.isHeader)
 
             Spacer(minLength: 0)
 
-            Button {
-                withAnimation(.snappy) { month = month.addingMonths(1) }
-            } label: {
-                Image(systemName: "chevron.right")
-                    .font(.subheadline.weight(.semibold))
-                    .frame(width: 34, height: 34)
-                    .background(Color(.tertiarySystemGroupedBackground), in: Circle())
+            CircleIconButton(
+                systemImage: "chevron.right",
+                tint: canGoForward ? AppTheme.accent : AppTheme.textTertiary,
+                accessibilityLabel: appState.string("common.nextMonth")
+            ) {
+                step(1)
             }
-            .buttonStyle(.plain)
             .disabled(!canGoForward)
-            .opacity(canGoForward ? 1 : 0.35)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .padding(.vertical, Spacing.xs)
+    }
+
+    private func step(_ value: Int) {
+        let target = month.addingMonths(value)
+        guard value <= 0 || canGoForward || target <= currentMonth else { return }
+        if reduceMotion {
+            month = target
+        } else {
+            withAnimation(.snappy) {
+                month = target
+            }
+        }
     }
 }

@@ -36,6 +36,7 @@ RESOURCE_FILES = [
     ("Assets.xcassets", "folder.assetcatalog"),
     ("PrivacyInfo.xcprivacy", "text.plist.xml"),
     ("Info.plist", "text.plist.xml"),
+    ("Localizable.xcstrings", "text.json.xcstrings"),
 ]
 
 
@@ -271,7 +272,7 @@ def main() -> None:
         sources_entries.append(f'\t\t\t\t{bf} /* {os.path.basename(rel)} in Sources */,')
 
     resources_entries = []
-    for file_name in ("Assets.xcassets", "PrivacyInfo.xcprivacy"):
+    for file_name in ("Assets.xcassets", "PrivacyInfo.xcprivacy", "Localizable.xcstrings"):
         bf = uid("buildfile", "resources", file_name)
         build_file_lines.append(
             f'\t\t{bf} /* {file_name} in Resources */ = {{isa = PBXBuildFile; '
@@ -404,7 +405,7 @@ def main() -> None:
         f'\t\t\tcompatibilityVersion = "{COMPATIBILITY_VERSION}";\n'
         f'\t\t\tdevelopmentRegion = en;\n'
         f'\t\t\thasScannedForEncodings = 0;\n'
-        f'\t\t\tknownRegions = (\n\t\t\t\ten,\n\t\t\t\tBase,\n\t\t\t);\n'
+        f'\t\t\tknownRegions = (\n\t\t\t\ten,\n\t\t\t\tvi,\n\t\t\t\tBase,\n\t\t\t);\n'
         f'\t\t\tmainGroup = {main_group_uid};\n'
         f'\t\t\tproductRefGroup = {products_group_uid} /* Products */;\n'
         f'\t\t\tprojectDirPath = "";\n'

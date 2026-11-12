@@ -27,11 +27,14 @@
 		FC1AE1F1DD0A915458158170 /* SeedData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E049E50808E0A40410BC650 /* SeedData.swift */; };
 		E7D32332E7778549A3BE7C36 /* Calendar+Months.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31AB0D9DEEB3FD311353D5D5 /* Calendar+Months.swift */; };
 		59C81AA9B9E2C90A19E0F718 /* Color+Hex.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05BC93266DEA21D345C30527 /* Color+Hex.swift */; };
+		02A8608645998286BB691F42 /* Components.swift in Sources */ = {isa = PBXBuildFile; fileRef = C28E0C3B8A4CF164C699DAF5 /* Components.swift */; };
 		34823A0664D87B29D9E40C91 /* DecimalParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C38343056C58720BF3E67AB /* DecimalParser.swift */; };
+		EC733A361B8E3DDBC4233D06 /* Localization.swift in Sources */ = {isa = PBXBuildFile; fileRef = 191BAF44EC35146EE87E6A06 /* Localization.swift */; };
 		B398D177E01964E1658B002D /* MonthPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA311868C845549E9151F044 /* MonthPicker.swift */; };
 		9626A767E8B0053B2169ED48 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE5C07CB2F5EA797472FE6A5 /* Theme.swift */; };
 		F4F5BFD207AE7E4102AF90C8 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 53BFACF22BD98CA54003260B /* Assets.xcassets */; };
 		AB22DE1BEF94CA4D21DA5BC8 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 7C2D952ACEB10468A7C2D258 /* PrivacyInfo.xcprivacy */; };
+		1E160C8446EF0562D253FD9E /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = B23F5BC209CAE2E794C3CF4E /* Localizable.xcstrings */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -55,12 +58,15 @@
 		8E049E50808E0A40410BC650 /* SeedData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeedData.swift; sourceTree = "<group>"; };
 		31AB0D9DEEB3FD311353D5D5 /* Calendar+Months.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Calendar+Months.swift; sourceTree = "<group>"; };
 		05BC93266DEA21D345C30527 /* Color+Hex.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Color+Hex.swift; sourceTree = "<group>"; };
+		C28E0C3B8A4CF164C699DAF5 /* Components.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Components.swift; sourceTree = "<group>"; };
 		1C38343056C58720BF3E67AB /* DecimalParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecimalParser.swift; sourceTree = "<group>"; };
+		191BAF44EC35146EE87E6A06 /* Localization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Localization.swift; sourceTree = "<group>"; };
 		FA311868C845549E9151F044 /* MonthPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonthPicker.swift; sourceTree = "<group>"; };
 		DE5C07CB2F5EA797472FE6A5 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		53BFACF22BD98CA54003260B /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		7C2D952ACEB10468A7C2D258 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		B5618D4C73F5589C19DB2591 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		B23F5BC209CAE2E794C3CF4E /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		874A673FD59BCD04A91054EB /* ExpenseTracker.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ExpenseTracker.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -127,7 +133,9 @@
 			children = (
 				31AB0D9DEEB3FD311353D5D5 /* Calendar+Months.swift */,
 				05BC93266DEA21D345C30527 /* Color+Hex.swift */,
+				C28E0C3B8A4CF164C699DAF5 /* Components.swift */,
 				1C38343056C58720BF3E67AB /* DecimalParser.swift */,
+				191BAF44EC35146EE87E6A06 /* Localization.swift */,
 				FA311868C845549E9151F044 /* MonthPicker.swift */,
 				DE5C07CB2F5EA797472FE6A5 /* Theme.swift */,
 			);
@@ -144,6 +152,7 @@
 				53BFACF22BD98CA54003260B /* Assets.xcassets */,
 				7C2D952ACEB10468A7C2D258 /* PrivacyInfo.xcprivacy */,
 				B5618D4C73F5589C19DB2591 /* Info.plist */,
+				B23F5BC209CAE2E794C3CF4E /* Localizable.xcstrings */,
 			);
 			path = ExpenseTracker;
 			sourceTree = "<group>";
@@ -191,6 +200,7 @@
 			hasScannedForEncodings = 0;
 			knownRegions = (
 				en,
+				vi,
 				Base,
 			);
 			mainGroup = 2A44C54E23411059C3A1A1E1;
@@ -210,6 +220,7 @@
 			files = (
 				F4F5BFD207AE7E4102AF90C8 /* Assets.xcassets in Resources */,
 				AB22DE1BEF94CA4D21DA5BC8 /* PrivacyInfo.xcprivacy in Resources */,
+				1E160C8446EF0562D253FD9E /* Localizable.xcstrings in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -240,7 +251,9 @@
 				FC1AE1F1DD0A915458158170 /* SeedData.swift in Sources */,
 				E7D32332E7778549A3BE7C36 /* Calendar+Months.swift in Sources */,
 				59C81AA9B9E2C90A19E0F718 /* Color+Hex.swift in Sources */,
+				02A8608645998286BB691F42 /* Components.swift in Sources */,
 				34823A0664D87B29D9E40C91 /* DecimalParser.swift in Sources */,
+				EC733A361B8E3DDBC4233D06 /* Localization.swift in Sources */,
 				B398D177E01964E1658B002D /* MonthPicker.swift in Sources */,
 				9626A767E8B0053B2169ED48 /* Theme.swift in Sources */,
 			);

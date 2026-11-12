@@ -28,11 +28,11 @@ final class MonthlyBudget {
 extension MonthlyBudget {
     /// Khoá duy nhất của hạn mức: tháng + danh mục (nil = tổng).
     var key: String {
-        MonthlyBudget.makeKey(month: monthStart, categoryName: category?.name)
+        MonthlyBudget.makeKey(month: monthStart, categoryKey: category?.stableKey)
     }
 
     /// Dựng khoá hạn mức mà không cần tạo model.
-    static func makeKey(month: Date, categoryName: String?) -> String {
-        "\(month.monthKey)|\(categoryName ?? "all")"
+    static func makeKey(month: Date, categoryKey: String?) -> String {
+        "\(month.monthKey)|\(categoryKey ?? "all")"
     }
 }

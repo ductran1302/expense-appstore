@@ -4,6 +4,7 @@ import Charts
 
 struct StatsView: View {
     @Environment(AppState.self) private var appState
+    @Environment(\.colorScheme) private var colorScheme
 
     @Query(sort: \ExpenseTransaction.date, order: .reverse) private var allTransactions: [ExpenseTransaction]
     @Query(sort: \ExpenseCategory.sortOrder) private var categories: [ExpenseCategory]
@@ -16,10 +17,10 @@ struct StatsView: View {
 
         var id: String { rawValue }
 
-        var title: String {
+        var title: LocalizedStringKey {
             switch self {
-            case .category: return "Theo danh mục"
-            case .daily: return "Theo ngày"
+            case .category: return L.chartByCategory
+            case .daily: return L.chartByDay
             }
         }
     }
@@ -27,111 +28,148 @@ struct StatsView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 16) {
+                VStack(spacing: Spacing.lg) {
                     MonthPicker(month: appState.monthBinding)
 
-                    summaryTiles
+                    // Số tổng chi là điểm nhấn: đặt nổi bật, không chia nhỏ
+                    // thành nhiều ô bằng nhau.
+                    VStack(alignment: .leading, spacing: Spacing.xs) {
+                        Text(L.statsSpent)
+                            .font(.footnote.weight(.medium))
+                            .foregroundStyle(AppTheme.textSecondary)
+                        Text(appState.format(monthTotal))
+                            .font(.system(.largeTitle, design: .rounded, weight: .bold))
+                            .foregroundStyle(AppTheme.textPrimary)
+                            .contentTransition(.numericText())
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.5)
+                        deltaLine
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .cardStyle(padding: Spacing.xl)
 
-                    Picker("Loại biểu đồ", selection: $chartMode) {
+                    Picker(selection: $chartMode) {
                         ForEach(ChartMode.allCases) { mode in
                             Text(mode.title).tag(mode)
                         }
                     }
                     .pickerStyle(.segmented)
-                    .padding(.horizontal, 16)
 
-                    switch chartMode {
-                    case .category:
-                        categoryChart
-                    case .daily:
-                        dailyChart
+                    chart
+
+                    if !categorySlices.isEmpty {
+                        breakdown
                     }
-
-                    categoryBreakdown
                 }
-                .padding(.bottom, 24)
+                .padding(.horizontal, Spacing.lg)
+                .padding(.bottom, Spacing.xxl)
             }
             .background(Color(.systemGroupedBackground))
-            .navigationTitle("Thống kê")
-            .navigationBarTitleDisplayMode(.inline)
+            .navigationTitle(L.statsTitle)
         }
     }
 
-    // MARK: - Summary
+    // MARK: - Delta
 
-    private var summaryTiles: some View {
-        VStack(spacing: 10) {
-            HStack(spacing: 10) {
-                StatTile(
-                    title: "Tổng chi",
-                    value: appState.format(monthTotal),
-                    caption: "tháng \(appState.selectedMonth.formatted(.dateTime.month(.wide)))",
-                    tint: AppTheme.expense,
-                    systemImage: "arrow.up.right"
-                )
-                StatTile(
-                    title: "Thu nhập",
-                    value: appState.format(monthIncome),
-                    caption: monthIncome > 0 ? "có ghi nhận" : "chưa có",
-                    tint: AppTheme.income,
-                    systemImage: "arrow.down.left"
-                )
-            }
+    @ViewBuilder
+    private var deltaLine: some View {
+        if previousMonthTotal > 0 {
+            let isUp = changeAmount > 0
+            let isFlat = changeAmount == 0
+            let percent = Int((abs(changeAmount) / previousMonthTotal * 100).rounded())
 
-            HStack(spacing: 10) {
-                StatTile(
-                    title: "So với tháng trước",
-                    value: appState.format(abs(changeAmount)),
-                    caption: changeLabel,
-                    tint: changeTint,
-                    systemImage: changeTint == AppTheme.success ? "arrow.down.right" : "arrow.up.right"
+            HStack(spacing: Spacing.xs) {
+                Badge(
+                    text: "\(percent)%",
+                    systemImage: isFlat ? "arrow.right" : (isUp ? "arrow.up.right" : "arrow.down.right"),
+                    tint: isFlat ? AppTheme.textSecondary : (isUp ? AppTheme.expense : AppTheme.success)
                 )
-                StatTile(
-                    title: "Số giao dịch",
-                    value: "\(monthTransactions.count)",
-                    caption: "trong tháng",
-                    tint: AppTheme.accent,
-                    systemImage: "number"
-                )
+                Text(L.vsLastMonth)
+                    .font(.caption)
+                    .foregroundStyle(AppTheme.textSecondary)
             }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(deltaAccessibilityLabel(percent: percent, isUp: isUp, isFlat: isFlat))
+        } else {
+            Text(L.noLastMonth)
+                .font(.caption)
+                .foregroundStyle(AppTheme.textTertiary)
         }
-        .padding(.horizontal, 16)
+    }
+
+    /// Nhãn đọc màn hình cho VoiceOver, có định dạng số theo locale đang dùng.
+    private func deltaAccessibilityLabel(percent: Int, isUp: Bool, isFlat: Bool) -> String {
+        let key: String
+        if isFlat {
+            key = "stats.flat"
+        } else if isUp {
+            key = "stats.up"
+        } else {
+            key = "stats.down"
+        }
+        return appState.string(key, arguments: "\(percent)%")
     }
 
     // MARK: - Charts
 
+    @ViewBuilder
+    private var chart: some View {
+        switch chartMode {
+        case .category:
+            categoryChart
+        case .daily:
+            dailyChart
+        }
+    }
+
     private var categoryChart: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(spacing: Spacing.md) {
             if categorySlices.isEmpty {
-                noData
+                emptyChart
             } else {
-                Chart(categorySlices) { slice in
-                    SectorMark(
-                        angle: .value("Chi tiêu", slice.amount),
-                        innerRadius: .ratio(0.62),
-                        angularInset: 1.5
-                    )
-                    .cornerRadius(4)
-                    .foregroundStyle(slice.color)
+                ZStack {
+                    Chart(categorySlices) { slice in
+                        SectorMark(
+                            angle: .value("Spent", slice.amount),
+                            innerRadius: .ratio(0.68),
+                            angularInset: 1.5
+                        )
+                        .cornerRadius(4)
+                        .foregroundStyle(slice.color)
+                    }
+                    .frame(height: 230)
+
+                    // Tổng nằm trong tâm vòng tròn: trục dữ liệu ở ngay
+                    // nơi mắt người dùng đã nhìn.
+                    VStack(spacing: 2) {
+                        Text(appState.format(monthTotal))
+                            .font(.system(.title3, design: .rounded, weight: .bold))
+                            .foregroundStyle(AppTheme.textPrimary)
+                            .monospacedDigit()
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.6)
+                        Text(L.statsTotal)
+                            .font(.caption2)
+                            .foregroundStyle(AppTheme.textSecondary)
+                    }
+                    .padding(.horizontal, Spacing.xxl)
                 }
-                .frame(height: 240)
-                .chartLegend(.hidden)
-                .padding(.vertical, 4)
+                .accessibilityLabel(L.statsTotal)
+                .accessibilityValue(appState.format(monthTotal))
             }
         }
-        .cardStyle()
-        .padding(.horizontal, 16)
+        .cardStyle(padding: Spacing.lg)
     }
 
     private var dailyChart: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: Spacing.md) {
             if dailyPoints.isEmpty {
-                noData
+                emptyChart
             } else {
                 Chart(dailyPoints) { point in
                     BarMark(
-                        x: .value("Ngày", point.date, unit: .day),
-                        y: .value("Chi tiêu", point.amount)
+                        x: .value("Day", point.date, unit: .day),
+                        y: .value("Spent", point.amount)
                     )
                     .foregroundStyle(AppTheme.accent.gradient)
                     .cornerRadius(3)
@@ -139,7 +177,7 @@ struct StatsView: View {
                 .frame(height: 220)
                 .chartYAxis {
                     AxisMarks(position: .leading) { value in
-                        AxisGridLine()
+                        AxisGridLine().foregroundStyle(AppTheme.separator)
                         AxisValueLabel {
                             if let amount = value.as(Double.self) {
                                 Text(appState.compact(amount))
@@ -154,67 +192,67 @@ struct StatsView: View {
                 }
             }
         }
-        .cardStyle()
-        .padding(.horizontal, 16)
+        .cardStyle(padding: Spacing.lg)
     }
 
-    private var noData: some View {
-        VStack(spacing: 8) {
+    private var emptyChart: some View {
+        VStack(spacing: Spacing.sm) {
             Image(systemName: "chart.pie")
-                .font(.system(size: 34))
-                .foregroundStyle(.tertiary)
-            Text("Chưa có dữ liệu trong tháng này")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .font(.system(size: 32, weight: .light))
+                .foregroundStyle(AppTheme.textTertiary)
+            Text(L.statsEmpty)
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(AppTheme.textSecondary)
+            Text(L.statsEmptyHint)
+                .font(.caption)
+                .foregroundStyle(AppTheme.textTertiary)
+                .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
-        .frame(height: 180)
+        .frame(height: 200)
     }
 
     // MARK: - Breakdown
 
-    private var categoryBreakdown: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Chi tiết danh mục")
-                .font(.headline)
+    private var breakdown: some View {
+        VStack(alignment: .leading, spacing: Spacing.md) {
+            SectionLabel(text: appState.string("stats.breakdown"))
 
-            if categorySlices.isEmpty {
-                Text("Chưa có chi tiêu nào.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            } else {
-                ForEach(categorySlices) { slice in
-                    HStack(spacing: 12) {
-                        ZStack {
-                            Circle()
-                                .fill(slice.color.opacity(0.16))
-                                .frame(width: 34, height: 34)
-                            Image(systemName: slice.symbol)
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundStyle(slice.color)
-                        }
+            ForEach(categorySlices) { slice in
+                VStack(spacing: Spacing.xs) {
+                    HStack(spacing: Spacing.sm) {
+                        Circle()
+                            .fill(slice.color)
+                            .frame(width: 10, height: 10)
+                            .accessibilityHidden(true)
 
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(slice.name)
-                                .font(.subheadline.weight(.medium))
-                            ProgressView(value: min(slice.ratio, 1))
-                                .tint(slice.color)
-                        }
+                        Text(slice.name)
+                            .font(.subheadline)
+                            .foregroundStyle(AppTheme.textPrimary)
 
-                        VStack(alignment: .trailing, spacing: 3) {
-                            Text(appState.format(slice.amount))
-                                .font(.subheadline.weight(.semibold))
-                            Text("\(Int(slice.ratio * 100))%")
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                        }
+                        Spacer(minLength: Spacing.sm)
+
+                        Text(appState.format(slice.amount))
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(AppTheme.textPrimary)
+                            .monospacedDigit()
+
+                        Text("\(Int(slice.ratio * 100))%")
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(AppTheme.textSecondary)
+                            .monospacedDigit()
+                            .frame(width: 42, alignment: .trailing)
                     }
-                    .padding(.vertical, 4)
+
+                    ProgressBar(value: slice.ratio, tint: slice.color, height: 4)
                 }
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel(
+                    "\(slice.name), \(appState.format(slice.amount)), \(Int(slice.ratio * 100))%"
+                )
             }
         }
-        .cardStyle()
-        .padding(.horizontal, 16)
+        .cardStyle(padding: Spacing.lg)
     }
 
     // MARK: - Data
@@ -245,23 +283,10 @@ struct StatsView: View {
         monthTotal - previousMonthTotal
     }
 
-    private var changeTint: Color {
-        if previousMonthTotal == 0 { return AppTheme.accent }
-        return changeAmount <= 0 ? AppTheme.success : AppTheme.danger
-    }
-
-    private var changeLabel: String {
-        if previousMonthTotal == 0 { return "chưa có dữ liệu tháng trước" }
-        let percent = (changeAmount / previousMonthTotal) * 100
-        let rounded = NSDecimalNumber(decimal: abs(percent)).intValue
-        return "\(rounded)% \(changeAmount <= 0 ? "ít hơn" : "nhiều hơn")"
-    }
-
     /// Một lát cột trong biểu đồ tròn.
     struct CategorySlice: Identifiable {
         let id: String
         let name: String
-        let symbol: String
         let color: Color
         /// Giá trị dùng cho biểu đồ (Charts yêu cầu kiểu số đo lường được).
         let amount: Double
@@ -270,7 +295,9 @@ struct StatsView: View {
     }
 
     private var categorySlices: [CategorySlice] {
-        let grouped = Dictionary(grouping: monthTransactions) { $0.category?.name ?? "Khác" }
+        let grouped = Dictionary(grouping: monthTransactions) { transaction in
+            transaction.category?.stableKey ?? "other"
+        }
         let total = grouped.values.reduce(Decimal.zero) { partial, transactions in
             partial + transactions.reduce(Decimal.zero) { $0 + max($1.amount, 0) }
         }
@@ -279,17 +306,20 @@ struct StatsView: View {
         let totalDouble = NSDecimalNumber(decimal: total).doubleValue
         var slices: [CategorySlice] = []
 
-        for (name, transactions) in grouped {
+        for (key, transactions) in grouped {
             let amount = transactions.reduce(Decimal.zero) { $0 + max($1.amount, 0) }
-            let category = categories.first { $0.name == name }
-            let color = Color(hex: category?.colorHex ?? "#6C757D")
+            let category = categories.first { $0.stableKey == key }
+            let categoryColor = CategoryColor(
+                hex: category?.colorHex ?? "#6C757D",
+                scheme: colorScheme
+            )
             let amountDouble = NSDecimalNumber(decimal: amount).doubleValue
             slices.append(
                 CategorySlice(
-                    id: name,
-                    name: name,
-                    symbol: category?.symbol ?? "questionmark.circle.fill",
-                    color: color,
+                    id: key,
+                    name: category.map { appState.categoryName($0) }
+                        ?? appState.string("category.other"),
+                    color: categoryColor.base,
                     amount: amountDouble,
                     ratio: totalDouble > 0 ? amountDouble / totalDouble : 0
                 )
